@@ -24,7 +24,7 @@ data <- jsonlite::fromJSON(
 
 df <- data$Events %>%
   purrr::map(1) %>%
-  dplyr::bind_rows(.id = SampleMetaData.ReportID) %>%
+  dplyr::bind_rows(.id = SampleMetaData.FMISSampleID) %>%
   tidyr::unnest(cols = c(
     LabMetaData.Reports,
     EventSamples.Soil.DepthRefs,
@@ -42,13 +42,13 @@ df <- data$Events %>%
     EventDate = EventMetaData.EventDate,
     EventType.Soil = EventMetaData.EventType.Soil,
     SampleNumber = SampleMetaData.SampleNumber,
-    PointID = SampleMetaData.ReportID,
+    FMISSampleID = SampleMetaData.FMISSampleID,
     Geometry = SampleMetaData.Geometry.wkt
   )
 
 # create unique SampleID from PointID and Date
 
-df$SampleID <- paste0(df$EventDate, "_", df$PointID)
+df$UniqueSampleID <- paste0(df$EventDate, "_", df$FMISSampleID)
 
 # parse coordinates into separate columns
 
