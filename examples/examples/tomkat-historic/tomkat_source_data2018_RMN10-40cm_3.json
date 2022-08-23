@@ -31,7 +31,8 @@
             {
               "SampleMetaData": {
                 "SampleNumber": "0",
-                "ReportID": "TOKA-016",
+                "ReportID": "1",
+                "FMISSampleID": "TOKA-016",
                 "Geometry": {
                   "wkt": "POINT(-122.3710921 37.2688015)"
                 }
@@ -46,6 +47,7 @@
                       "Value": 5.8
                     },
                     {
+                      "Element": "Sand",
                       "ValueUnit": "%",
                       "Value": 52.5
                     },
@@ -106,7 +108,8 @@
             {
               "SampleMetaData": {
                 "SampleNumber": "1",
-                "ReportID": "TOKA-018",
+                "ReportID": "1",
+                "FMISSampleID": "TOKA-018",
                 "Geometry": {
                   "wkt": "POINT(-122.3688064 37.2723949)"
                 }
@@ -121,6 +124,7 @@
                       "Value": 2.2
                     },
                     {
+                      "Element": "Sand",
                       "ValueUnit": "%",
                       "Value": 22.5
                     },
@@ -181,7 +185,8 @@
             {
               "SampleMetaData": {
                 "SampleNumber": "2",
-                "ReportID": "TOKA-029",
+                "ReportID": "1",
+                "FMISSampleID": "TOKA-029",
                 "Geometry": {
                   "wkt": "POINT(-122.3643101 37.2705681)"
                 }
@@ -196,6 +201,7 @@
                       "Value": 3.3
                     },
                     {
+                      "Element": "Sand",
                       "ValueUnit": "%",
                       "Value": 20
                     },
@@ -256,7 +262,8 @@
             {
               "SampleMetaData": {
                 "SampleNumber": "3",
-                "ReportID": "TOKA-060",
+                "ReportID": "1",
+                "FMISSampleID": "TOKA-060",
                 "Geometry": {
                   "wkt": "POINT(-122.3552566 37.2741247)"
                 }
@@ -271,6 +278,7 @@
                       "Value": 5.9
                     },
                     {
+                      "Element": "Sand",
                       "ValueUnit": "%",
                       "Value": 36.2
                     },

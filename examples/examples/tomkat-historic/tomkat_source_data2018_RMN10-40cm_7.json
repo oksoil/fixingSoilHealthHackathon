@@ -31,7 +31,8 @@
             {
               "SampleMetaData": {
                 "SampleNumber": "0",
-                "ReportID": "TOKA-035",
+                "ReportID": "1",
+                "FMISSampleID": "TOKA-035",
                 "Geometry": {
                   "wkt": "POINT(-122.3619935 37.2777667)"
                 }
@@ -41,6 +42,7 @@
                   "DepthID": "1",
                   "NutrientResults": [
                     {
+                      "Element": "Sand",
                       "ValueUnit": "%",
                       "Value": 51.9
                     },

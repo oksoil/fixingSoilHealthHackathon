@@ -18,6 +18,8 @@ export type SupportedFormats = 'tomkat' | 'generic';
 //
 // Ppssible input parameters for xlsx/csv parsing:
 // Either give an already-parsed workbook, an entire CSV as a string, or an arraybuffer, or a base64 string
+// Default CSV/XLSX format is tomkat
+
 export function parse(
   { wb, str, arrbuf, base64, format }:
   { 
@@ -25,7 +27,7 @@ export function parse(
     str?: string, 
     arrbuf?: ArrayBuffer,
     base64?: string, // base64 string
-    format: 'tomkat' | 'generic', // add others here as more become known
+    format?: 'tomkat' | 'generic', // add others here as more become known
   }
 ): ModusResult[] {
 
@@ -42,6 +44,8 @@ export function parse(
   if (!wb) {
     throw new Error('No readable input data found.');
   }
+
+  if (!format) format = 'tomkat';
 
   switch (format) {
     case 'tomkat': return parseTomKat({ wb });
@@ -68,7 +72,7 @@ function parseTomKat({ wb }: { wb: xlsx.WorkBook }): ModusResult[] {
       // If you don't put { raw: false } for sheet_to_json, it will parse dates as ints instead of the formatted strings
       const rows = xlsx.utils.sheet_to_json(wb.Sheets[sheetname]!, { raw: false }).map(keysToUpperNoSpacesDashesOrUnderscores);
       for (const r of rows ) {
-        const id = r['POINTID'];
+        const id = r['POINTID'] || r['FMISSAMPLEID'];
         if (!id) continue;
         pointmeta[id] = r;
       }
@@ -167,17 +171,25 @@ function parseTomKat({ wb }: { wb: xlsx.WorkBook }): ModusResult[] {
         const sample: any = {
           SampleMetaData: {
             SampleNumber: ''+index,
-            ReportID: ''+id,
+            ReportID: "1",
+            FMISSampleID: ''+id,
           },
           Depths: [
             { DepthID, NutrientResults }
           ]
         };
-        if (meta) {
-          const wkt = parseWKTFromPointMeta(meta);
-          if (wkt) {
-            sample.SampleMetaData.Geometry = { wkt };
-          }
+
+        // Parse locations: either in the sample itself or in the meta.  Sample takes precedence over meta.
+        let wkt = parseWKTFromPointMetaOrRow(row);
+        if (!wkt && meta) {
+          trace('No location info found in row, checking for any in meta');
+          wkt = parseWKTFromPointMetaOrRow(meta);
+        }
+        if (!wkt) {
+          trace('No location info found for row either in the row or in the meta');
+        }
+        if (wkt) {
+          sample.SampleMetaData.Geometry = { wkt };
         }
         samples.push(sample);
 
@@ -292,28 +304,29 @@ type NutrientResult = {
 };
 function parseSampleID(row: any): string {
   const copy = keysToUpperNoSpacesDashesOrUnderscores(row);
-  return copy['POINTID'] || '';
+  return copy['POINTID'] || copy['FMISSAMPLEID'] || '';
 }
 
 // Make a WKT from point meta's Latitude_DD and Longitude_DD.  Do a "tolerant" parse so anything
 // with latitude or longitude (can insensitive) or "lat" and "lon" or "long" would still get a WKT
-function parseWKTFromPointMeta(meta: any): string {
-  let copy = keysToUpperNoSpacesDashesOrUnderscores(meta);
+function parseWKTFromPointMetaOrRow(meta_or_row: any): string {
+  let copy = keysToUpperNoSpacesDashesOrUnderscores(meta_or_row);
 
   let longKey = Object.keys(copy).find(key => key.includes("LONGITUDE"))
   let latKey = Object.keys(copy).find(key => key.includes("LATITUDE"))
 
   if (copy["LONG"]) longKey = "LONG";
   if (copy["LNG"]) longKey = "LNG";
+  if (copy["LON"]) longKey = "LON";
   if (copy["LAT"]) latKey = "LAT";
 
   if (!longKey) {
-    error('No longitude for point meta: ', meta);
-    throw new Error(`Longitude value not present for point meta ${copy.POINTID}`);
+    trace('No longitude for point: ', meta_or_row.POINTID || meta_or_row.FMISSAMPLEID);
+    return '';
   }
   if (!latKey) {
-    error('No latitude for point meta: ', meta);
-    throw new Error(`Latitude value not present for point meta ${copy.POINTID}`);
+    trace('No latitude for point: ', meta_or_row.POINTID || meta_or_row.FMISSAMPLEID);
+    return '';
   }
 
   let long = copy[longKey];
@@ -331,7 +344,7 @@ let nutrientColHeaders: Record<string,any> = {
   },
   "OM": {
     Element: "OM",
-    ValueUnit: "ppm"
+    ValueUnit: "%"
   },
   "Organic Matter LOI %": {
     Element: "OM (LOI)",
@@ -339,6 +352,10 @@ let nutrientColHeaders: Record<string,any> = {
   },
   "Organic Matter": {
      Element: "OM",
+     ValueUnit: "%"
+  },
+  "OM (LOI)": {
+     Element: "OM (LOI)",
      ValueUnit: "%"
   },
   "Olsen P ppm P": {
@@ -357,11 +374,23 @@ let nutrientColHeaders: Record<string,any> = {
     Element: "P",
     ValueUnit: "ppm"
   },
+  "P": {
+    Element: "P",
+    ValueUnit: "ppm"
+  },
   "Pb lead": {
     Element: "Pb",
     ValueUnit: "ppm"
   },
+  "Pb": {
+    Element: "Pb",
+    ValueUnit: "ppm"
+  },
   "Potassium ppm K": {
+    Element: "K",
+    ValueUnit: "ppm"
+  },
+  "K": {
     Element: "K",
     ValueUnit: "ppm"
   },
@@ -371,6 +400,10 @@ let nutrientColHeaders: Record<string,any> = {
   },
   "K potassium": {
     Element: "K",
+    ValueUnit: "ppm"
+  },
+  "Ca": {
+    Element: "Ca",
     ValueUnit: "ppm"
   },
   "Calcium ppm Ca": {
@@ -389,11 +422,23 @@ let nutrientColHeaders: Record<string,any> = {
     Element: "Cd",
     ValueUnit: "ppm"
   },
-  "Cr chromium": {
+  "Cd": {
     Element: "Cd",
     ValueUnit: "ppm"
   },
+  "Cr chromium": {
+    Element: "Cr",
+    ValueUnit: "ppm"
+  },
+  "Cr": {
+    Element: "Cr",
+    ValueUnit: "ppm"
+  },
   "Magnesium ppm Mg": {
+    Element: "Mg",
+    ValueUnit: "ppm"
+  },
+  "Mg": {
     Element: "Mg",
     ValueUnit: "ppm"
   },
@@ -405,6 +450,10 @@ let nutrientColHeaders: Record<string,any> = {
     Element: "Mg",
     ValueUnit: "ppm"
   },
+  "Mo": {
+    Element: "Mo",
+    ValueUnit: "ppm"
+  },
   "Mo molybdenum": {
     Element: "Mo",
     ValueUnit: "ppm"
@@ -412,6 +461,10 @@ let nutrientColHeaders: Record<string,any> = {
   "CEC/Sum of Cations me/100g": {
     Element: "CEC",
     ValueUnit: "Sum of Cations me/100g"
+  },
+  "CEC": {
+    Element: "CEC",
+    ValueUnit: "cmol(+)/kg"
   },
   "CEC (Estimated)": {
     Element: "CEC",
@@ -421,12 +474,28 @@ let nutrientColHeaders: Record<string,any> = {
     Element: "BS-Ca",
     ValueUnit: "%"
   },
+  "BS-Ca": {
+    Element: "BS-Ca",
+    ValueUnit: "%"
+  },
+  "BS-Mg": {
+    Element: "BS-Mg",
+    ValueUnit: "%"
+  },
   "%Mg Sat": {
     Element: "BS-Mg",
     ValueUnit: "%"
   },
+  "BS-K": {
+    Element: "BS-K",
+    ValueUnit: "%"
+  },
   "%K Sat": {
     Element: "BS-K",
+    ValueUnit: "%"
+  },
+  "BS-Na": {
+    Element: "BS-Na",
     ValueUnit: "%"
   },
   "%Na Sat": {
@@ -437,7 +506,15 @@ let nutrientColHeaders: Record<string,any> = {
     Element: "BS-H",
     ValueUnit: "%"
   },
+  "BS-H": {
+    Element: "BS-H",
+    ValueUnit: "%"
+  },
   "Sulfate-S ppm S": {
+    Element: "SO4-S",
+    ValueUnit: "ppm"
+  },
+  "SO4-S": {
     Element: "SO4-S",
     ValueUnit: "ppm"
   },
@@ -445,7 +522,15 @@ let nutrientColHeaders: Record<string,any> = {
     Element: "S",
     ValueUnit: "ppm"
   },
+  "S": {
+    Element: "S",
+    ValueUnit: "ppm"
+  },
   "Zinc ppm Zn": {
+    Element: "Zn",
+    ValueUnit: "ppm",
+  },
+  "Zn": {
     Element: "Zn",
     ValueUnit: "ppm",
   },
@@ -457,11 +542,19 @@ let nutrientColHeaders: Record<string,any> = {
     Element: "Mn",
     ValueUnit: "ppm"
   },
+  "Mn": {
+    Element: "Mn",
+    ValueUnit: "ppm"
+  },
   "Mn manganese": {
     Element: "Mn",
     ValueUnit: "ppm"
   },
   "Boron ppm B": {
+    Element: "B",
+    ValueUnit: "ppm"
+  },
+  "B": {
     Element: "B",
     ValueUnit: "ppm"
   },
@@ -481,7 +574,15 @@ let nutrientColHeaders: Record<string,any> = {
     Element: "Fe",
     ValueUnit: "ppm"
   },
+  "Fe": {
+    Element: "Fe",
+    ValueUnit: "ppm"
+  },
   "Cu copper": {
+    Element: "Cu",
+    ValueUnit: "ppm"
+  },
+  "Cu": {
     Element: "Cu",
     ValueUnit: "ppm"
   },
@@ -492,11 +593,22 @@ let nutrientColHeaders: Record<string,any> = {
   "Excess Lime": {
     Element: "Lime Rec",
   },
+  "Lime Rec": {
+    Element: "Lime Rec",
+  },
   "WRDF Buffer pH": {
-    Element: "BpH",
+    Element: "B-pH (W)",
+  },
+  "BpH (W)": {
+    Element: "BpH (W)",
   },
   "1:1 S Salts mmho/cm": {
-    ValueUnit: "mmho/cm"
+    ValueUnit: "mmho/cm",
+    Element: "SS"
+  },
+  "SS": {
+    ValueUnit: "mmho/cm",
+    Element: "SS"
   },
   "Nitrate-N ppm N": {
     Element: "NO3-N",
@@ -506,7 +618,15 @@ let nutrientColHeaders: Record<string,any> = {
     Element: "NO3-N",
     ValueUnit: "ppm"
   },
+  "NO3-N": {
+    Element: "NO3-N",
+    ValueUnit: "ppm"
+  },
   "Ni nickel": {
+    Element: "Ni",
+    ValueUnit: "ppm"
+  },
+  "Ni": {
     Element: "Ni",
     ValueUnit: "ppm"
   },
@@ -518,11 +638,19 @@ let nutrientColHeaders: Record<string,any> = {
     Element: "Na",
     ValueUnit: "ppm"
   },
+  "Na": {
+    Element: "Na",
+    ValueUnit: "ppm"
+  },
   "Sodium": {
     Element: "Na",
     ValueUnit: "cmol(+)/kg"
   },
-  "Aluminium ppm Na": {
+  "Aluminium ppm Al": {
+    Element: "Al",
+    ValueUnit: "ppm"
+  },
+  "Al": {
     Element: "Al",
     ValueUnit: "ppm"
   },
@@ -538,11 +666,23 @@ let nutrientColHeaders: Record<string,any> = {
     Element: "As",
     ValueUnit: "ppm"
   },
-  "Chloride ppm Na": {
+  "As": {
+    Element: "As",
+    ValueUnit: "ppm"
+  },
+  "Chloride ppm Cl": {
+    Element: "Cl",
+    ValueUnit: "ppm"
+  },
+  "Cl": {
     Element: "Cl",
     ValueUnit: "ppm"
   },
   "Total N ppm": {
+    Element: "TN",
+    ValueUnit: "ppm"
+  },
+  "TN": {
     Element: "TN",
     ValueUnit: "ppm"
   },
@@ -559,6 +699,7 @@ let nutrientColHeaders: Record<string,any> = {
     ValueUnit: "%"
   },
   "Sand": {
+    Element: "Sand",
     ValueUnit: "%"
   },
   "% Silt": {
@@ -591,8 +732,20 @@ let nutrientColHeaders: Record<string,any> = {
     Element: "TOC",
     ValueUnit: "%"
   },
+  "TOC": {
+    Element: "TOC",
+    ValueUnit: "%"
+  },
+  "TN (W)": {
+    Element: "TN (W)",
+    ValueUnit: "ppm"
+  },
   "Water Extractable Total N": {
     Element: "TN (W)",
+    ValueUnit: "ppm"
+  },
+  "TC (W)": {
+    Element: "TC (W)",
     ValueUnit: "ppm"
   },
   "Water Extractable Total C": {
@@ -605,30 +758,6 @@ let nutrientColHeaders: Record<string,any> = {
   },
   "TC": {
     Element: "TC",
-    ValueUnit: "ppm"
-  },
-  "Ca": {
-    Element: "Ca",
-    ValueUnit: "ppm"
-  },
-  "K": {
-    Element: "K",
-    ValueUnit: "ppm"
-  },
-  "Mg": {
-    Element: "Mg",
-    ValueUnit: "ppm"
-  },
-  "Mn": {
-    Element: "Mn",
-    ValueUnit: "ppm"
-  },
-  "P": {
-    Element: "P",
-    ValueUnit: "ppm"
-  },
-  "Zn": {
-    Element: "Zn",
     ValueUnit: "ppm"
   },
   /* Didn't see these in the official modus element list
@@ -661,17 +790,26 @@ let nutrientColHeaders: Record<string,any> = {
 
 function parseNutrientResults(row: any, units?: Record<string,string>): NutrientResult[] {
   return Object.keys(row)
+    .map(key => key.trim())
     .filter(key => key in nutrientColHeaders)
     .filter(key => !isNaN(row[key]))
     .map(key => key.replace(/\n/g, ' '))
     .map(key => key.replace(/ +/g, ' ').trim())
-    .map(key => ({
-      Element: nutrientColHeaders[key].Element,
-      // prioritize user-specified units (from "UNITS" row indicator) over
-      // matcher-based units, else "none".
-      ValueUnit: units![key] || nutrientColHeaders[key].ValueUnit || "none",
-      Value: +(row[key])
-    }))
+    .map(key => {
+      let unitMatches = key.match(/\[([^\]]+)\]/g)
+      let unitStr = '';
+      if (unitMatches && unitMatches.length > 0) {
+        unitStr = unitMatches[unitMatches.length-1] || '';
+        unitStr.replace('[', '').replace(']', '')
+      }
+      return {
+        Element: nutrientColHeaders[key].Element,
+        // prioritize user-specified units (from "UNITS" row indicator) over
+        // matcher-based units, else "none".
+        ValueUnit: unitStr || units![key] || nutrientColHeaders[key].ValueUnit || "none",
+        Value: +(row[key]),
+      };
+    })
 }
 
 // sheetname is just for debugging
@@ -729,3 +867,98 @@ function parseDepth(row: any, units?: any, sheetname?: string): Depth {
 
   return obj;
 }
+
+export function toCsv(input: ModusResult | ModusResult[]) {
+
+  let data = [];
+
+  if (Array.isArray(input)) {
+    data = input.map((mr: ModusResult) => toCsvObject(mr)).flat(1);
+  } else {
+    data = toCsvObject(input);
+  }
+  let sheet = xlsx.utils.json_to_sheet(data);
+
+  return {
+    wb: {
+      Sheets: {"Sheet1": sheet},
+      SheetNames: ["Sheet1"]
+    } as xlsx.WorkBook,
+    str: xlsx.utils.sheet_to_csv(sheet)
+  }
+}
+
+function toCsvObject(input: ModusResult) {
+  return input.Events!.map(event => {
+    let eventMeta = {
+      EventDate: event.EventMetaData!.EventDate,
+      EventType: "Soil" // Hard-coded for now. This is all soil data at the moment
+    };
+
+    let allReports = toReportsObj(event.LabMetaData!.Reports);
+
+    let allDepthRefs = toDepthRefsObj(event.EventSamples!.Soil!.DepthRefs)
+
+    return event.EventSamples!.Soil!.SoilSamples!.map(sample => {
+      let sampleMeta = toSampleMetaObj(sample.SampleMetaData, allReports);
+
+      return sample.Depths!.map(depth => {
+        let nutrients = toNutrientResultsObj(depth)
+
+        return {
+          ...eventMeta,
+          ...sampleMeta,
+          ...allDepthRefs[depth.DepthID!],
+          ...nutrients,
+        }
+      })
+    })
+  }).flat(3)
+}
+
+function toSampleMetaObj(sampleMeta: any, allReports: any) {
+  let ll = sampleMeta.Geometry.wkt.replace("POINT(", "").replace(")", "").trim().split(' ');
+  return {
+    SampleNumber: sampleMeta.SampleNumber,
+    ...allReports[sampleMeta.ReportID],
+    Latitude: +(ll[0]),
+    Longitude: +(ll[1]),
+    FMISSampleID: sampleMeta.FMISSampleID
+  }
+}
+
+function toDepthRefsObj(depthRefs: any) : any  {
+  return Object.fromEntries(
+    depthRefs.map(
+      (dr: Depth) => [dr.DepthID, {
+        DepthID: ''+dr.DepthID,
+        [`StartingDepth [${dr.DepthUnit}]`]: dr.StartingDepth,
+        [`EndingDepth [${dr.DepthUnit}]`]: dr.EndingDepth,
+        [`ColumnDepth [${dr.DepthUnit}]`]: dr.ColumnDepth,
+      }]
+    )
+  )
+}
+
+function toReportsObj(reports: any) : any  {
+  return Object.fromEntries(
+    reports.map((r: any) => [r.ReportID, {
+      FileDescription: r.FileDescription,
+      ReportID: r.ReportID
+    }])
+  )
+}
+
+function toNutrientResultsObj(sampleDepth: any) {
+  return Object.fromEntries(
+    sampleDepth.NutrientResults.map(
+      (nr: NutrientResult) => [`${nr.Element} [${nr.ValueUnit}]`, nr.Value]
+    )
+  )
+}
+
+type ModusCsvRow = {
+  ReportID: string,
+}
+
+type ModusCsv = ModusCsvRow[];

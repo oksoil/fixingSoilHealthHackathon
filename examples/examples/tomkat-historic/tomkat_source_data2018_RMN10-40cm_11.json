@@ -31,7 +31,8 @@
             {
               "SampleMetaData": {
                 "SampleNumber": "0",
-                "ReportID": "TOKA-064",
+                "ReportID": "1",
+                "FMISSampleID": "TOKA-064",
                 "Geometry": {
                   "wkt": "POINT(-122.3530163 37.2723097)"
                 }
@@ -46,6 +47,7 @@
                       "Value": 19.8
                     },
                     {
+                      "Element": "Sand",
                       "ValueUnit": "%",
                       "Value": 30
                     },
@@ -106,7 +108,8 @@
             {
               "SampleMetaData": {
                 "SampleNumber": "1",
-                "ReportID": "TOKA-161",
+                "ReportID": "1",
+                "FMISSampleID": "TOKA-161",
                 "Geometry": {
                   "wkt": "POINT(-122.3485204 37.2704822)"
                 }
@@ -116,6 +119,7 @@
                   "DepthID": "1",
                   "NutrientResults": [
                     {
+                      "Element": "Sand",
                       "ValueUnit": "%",
                       "Value": 26.2
                     },
