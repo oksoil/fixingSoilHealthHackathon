@@ -46,6 +46,10 @@ df <- data$Events %>%
     Geometry = SampleMetaData.Geometry.wkt
   )
 
+# create unique SampleID from PointID and Date
+
+df$SampleID <- paste0(df$EventDate, "_", df$PointID)
+
 # parse coordinates into separate columns
 
 df <- df %>%
