@@ -58,6 +58,7 @@ m <- addCircleMarkers(m,
 m <- addMinicharts(m,
   dfW$long, dfW$lat,
   chartdata = dfW[, c("BulkDensity", "pH", "TOC")],
+  type = "bar",
   width = 45, height = 45
 )
 
